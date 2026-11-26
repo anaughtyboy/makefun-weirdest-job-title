@@ -1,5 +1,5 @@
 // Weirdest Job Title — one job title, written to /output/entry.txt
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // The title itself: a real-sounding job with one oddly specific twist.
@@ -15,19 +15,21 @@ function main(): void {
     throw new Error("title must be a single line with no surrounding whitespace");
   }
 
-  const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+  // An empty MAKEFUN_OUTPUT_DIR means "no override", not "the current dir".
+  const outDir = process.env.MAKEFUN_OUTPUT_DIR?.trim() ? process.env.MAKEFUN_OUTPUT_DIR : "/output";
   mkdirSync(outDir, { recursive: true });
   const target = join(outDir, "entry.txt");
   writeFileSync(target, TITLE, "utf8");
 
-  // Read the file back and confirm the exact bytes landed, with no
-  // trailing newline added by the write.
+  // Confirm the file on disk is exactly the title's bytes: stat first,
+  // then read the content back and compare it character for character.
   const back = readFileSync(target, "utf8");
   if (back !== TITLE) {
     throw new Error("read-back mismatch: entry.txt does not match the title");
   }
-  if (Buffer.byteLength(back, "utf8") !== Buffer.byteLength(TITLE, "utf8")) {
-    throw new Error("read-back byte length mismatch");
+  const size = statSync(target).size;
+  if (size !== Buffer.byteLength(TITLE, "utf8")) {
+    throw new Error(`entry.txt is ${size} bytes, expected ${Buffer.byteLength(TITLE, "utf8")}`);
   }
   console.log(`wrote ${Buffer.byteLength(TITLE, "utf8")} bytes to ${target}`);
 }
